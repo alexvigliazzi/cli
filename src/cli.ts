@@ -4,13 +4,14 @@ import { authCommand } from './commands/auth/index.js';
 import { configCommand } from './commands/config.js';
 import { upgradeCommand } from './commands/upgrade.js';
 import { telemetryCommand } from './commands/telemetry.js';
+import { prCommand } from './commands/pr.js';
 
 const program = new Command();
 
 program
   .name('kodus')
   .description('Kodus CLI - AI-powered code review from your terminal')
-  .version('0.1.0')
+  .version('1.0.0')
   .option('-f, --format <format>', 'Output format: terminal, json, markdown', 'terminal')
   .option('-o, --output <file>', 'Output file (for json/markdown)')
   .option('-v, --verbose', 'Verbose output', false)
@@ -23,6 +24,7 @@ program.addCommand(authCommand);
 program.addCommand(configCommand);
 program.addCommand(upgradeCommand);
 program.addCommand(telemetryCommand);
+program.addCommand(prCommand);
 
 export { program };
 

@@ -74,6 +74,15 @@ export interface ReviewResult {
   duration: number;
 }
 
+export interface PullRequestSuggestionsResponse {
+  summary?: string;
+  issues?: ReviewIssue[];
+  suggestions?: ReviewIssue[];
+  filesAnalyzed?: number;
+  duration?: number;
+  markdown?: string;
+}
+
 export interface TrialReviewResult extends ReviewResult {
   trialInfo: {
     reviewsUsed: number;
@@ -156,4 +165,13 @@ export class AuthError extends Error {
     this.name = 'AuthError';
   }
 }
+
+export interface GitInfo {
+  userEmail?: string;
+  remote?: string | null;
+  branch?: string;
+  commitSha?: string;
+}
+
+export type PlatformType = 'GITHUB' | 'GITLAB' | 'BITBUCKET' | 'AZURE_REPOS' | undefined;
 

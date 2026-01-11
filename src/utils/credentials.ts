@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import type { StoredCredentials } from '../types/index.js';
+import type { StoredCredentials, GitInfo, PlatformType } from '../types/index.js';
 
 const KODUS_DIR = path.join(os.homedir(), '.kodus');
 const CREDENTIALS_FILE = path.join(KODUS_DIR, 'credentials.json');

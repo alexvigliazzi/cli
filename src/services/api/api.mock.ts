@@ -3,11 +3,12 @@ import type {
   RemoteConfig,
   ReviewConfig,
   ReviewResult,
+  PullRequestSuggestionsResponse,
   TrialReviewResult,
   TrialStatus,
 } from '../../types/index.js';
 import { ApiError } from '../../types/index.js';
-import type { IKodusApi, IAuthApi, IReviewApi, IConfigApi, ITrialApi } from './api.interface.js';
+import type { IKodusApi, IAuthApi, IReviewApi, IConfigApi, ITrialApi, GitMetrics } from './api.interface.js';
 
 const MOCK_DELAY = 800;
 
@@ -166,6 +167,37 @@ class MockReviewApi implements IReviewApi {
       issues: selectedIssues,
       filesAnalyzed: fileCount,
       duration: Math.floor(Math.random() * 2000) + 1000,
+    };
+  }
+
+  async analyzeWithMetrics(
+    diff: string,
+    accessToken: string,
+    config?: ReviewConfig,
+    _metrics?: GitMetrics
+  ): Promise<ReviewResult> {
+    if (_metrics) {
+      console.warn('Mocked analyzeWithMetrics call ignores provided metrics.');
+    }
+    return this.analyze(diff, accessToken, config);
+  }
+
+  async getPullRequestSuggestions(
+    _accessToken: string,
+    params: { prUrl?: string; prNumber?: number; repositoryId?: string; format?: 'markdown' }
+  ): Promise<PullRequestSuggestionsResponse> {
+    await delay(MOCK_DELAY);
+
+    if (!params.prUrl && !(params.prNumber && params.repositoryId)) {
+      throw new ApiError(400, 'prUrl or prNumber + repositoryId are required');
+    }
+
+    return {
+      summary: 'Mocked pull request suggestions',
+      suggestions: mockIssues,
+      filesAnalyzed: 1,
+      duration: MOCK_DELAY,
+      markdown: params.format === 'markdown' ? '# Mocked pull request suggestions\n- Suggestion 1' : undefined,
     };
   }
 

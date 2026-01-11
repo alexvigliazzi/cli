@@ -3,11 +3,12 @@ import type {
   RemoteConfig,
   ReviewConfig,
   ReviewResult,
+  PullRequestSuggestionsResponse,
   TrialReviewResult,
   TrialStatus,
 } from '../../types/index.js';
 import { ApiError } from '../../types/index.js';
-import type { IKodusApi, IAuthApi, IReviewApi, IConfigApi, ITrialApi } from './api.interface.js';
+import type { IKodusApi, IAuthApi, IReviewApi, IConfigApi, ITrialApi, GitMetrics } from './api.interface.js';
 
 const API_BASE_URL = process.env.KODUS_API_URL || 'https://api.kodus.io';
 
@@ -145,12 +146,18 @@ class RealAuthApi implements IAuthApi {
 
 class RealReviewApi implements IReviewApi {
   async analyze(diff: string, accessToken: string, config?: ReviewConfig): Promise<ReviewResult> {
-    // SECURITY NOTE: We extract organizationId from JWT and send as teamId query param.
-    // The backend MUST validate the JWT signature and verify that the authenticated user
-    // has permission to access this team. The backend should NOT trust the teamId parameter
-    // alone - it should cross-check it against the validated token claims.
+    const isTeamKey = accessToken.startsWith('kodus_');
 
-    // Extract organizationId from JWT
+    if (isTeamKey) {
+      return request<ReviewResult>('/cli/review', {
+        method: 'POST',
+        headers: {
+          'X-Team-Key': accessToken,
+        },
+        body: JSON.stringify({ diff, config }),
+      });
+    }
+
     let teamId: string | undefined;
     try {
       const payload = JSON.parse(Buffer.from(accessToken.split('.')[1], 'base64').toString());
@@ -159,7 +166,6 @@ class RealReviewApi implements IReviewApi {
       // Ignore if cannot decode
     }
 
-    // Build URL with teamId query string
     const endpoint = teamId ? `/cli/review?teamId=${encodeURIComponent(teamId)}` : '/cli/review';
 
     return request<ReviewResult>(endpoint, {
@@ -168,6 +174,63 @@ class RealReviewApi implements IReviewApi {
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ diff, config }),
+    });
+  }
+
+  async analyzeWithMetrics(
+    diff: string,
+    accessToken: string,
+    config?: ReviewConfig,
+    metrics?: GitMetrics
+  ): Promise<ReviewResult> {
+    const isTeamKey = accessToken.startsWith('kodus_');
+
+    if (isTeamKey) {
+      return request<ReviewResult>('/cli/review', {
+        method: 'POST',
+        headers: {
+          'X-Team-Key': accessToken,
+        },
+        body: JSON.stringify({
+          diff,
+          config,
+          ...metrics,
+        }),
+      });
+    }
+
+    return this.analyze(diff, accessToken, config);
+  }
+
+  async getPullRequestSuggestions(
+    accessToken: string,
+    params: { prUrl?: string; prNumber?: number; repositoryId?: string; format?: 'markdown' }
+  ): Promise<PullRequestSuggestionsResponse> {
+    const query = new URLSearchParams();
+
+    if (params.prUrl) {
+      query.set('prUrl', params.prUrl);
+    }
+
+    if (params.prNumber !== undefined) {
+      query.set('prNumber', params.prNumber.toString());
+    }
+
+    if (params.repositoryId) {
+      query.set('repositoryId', params.repositoryId);
+    }
+
+    if (params.format) {
+      query.set('format', params.format);
+    }
+
+    const queryString = query.toString();
+    const endpoint = `/pull-requests/suggestions${queryString ? `?${queryString}` : ''}`;
+
+    return request<PullRequestSuggestionsResponse>(endpoint, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     });
   }
 

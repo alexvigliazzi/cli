@@ -3,6 +3,7 @@ import type {
   RemoteConfig,
   ReviewConfig,
   ReviewResult,
+  PullRequestSuggestionsResponse,
   TrialReviewResult,
   TrialStatus,
   UserInfo,
@@ -17,8 +18,22 @@ export interface IAuthApi {
   verify(accessToken: string): Promise<{ valid: boolean; user?: UserInfo }>;
 }
 
+export interface GitMetrics {
+  userEmail?: string;
+  gitRemote?: string;
+  branch?: string;
+  commitSha?: string;
+  inferredPlatform?: 'GITHUB' | 'GITLAB' | 'BITBUCKET' | 'AZURE_REPOS';
+  cliVersion?: string;
+}
+
 export interface IReviewApi {
   analyze(diff: string, accessToken: string, config?: ReviewConfig): Promise<ReviewResult>;
+  analyzeWithMetrics(diff: string, accessToken: string, config?: ReviewConfig, metrics?: GitMetrics): Promise<ReviewResult>;
+  getPullRequestSuggestions(
+    accessToken: string,
+    params: { prUrl?: string; prNumber?: number; repositoryId?: string; format?: 'markdown' }
+  ): Promise<PullRequestSuggestionsResponse>;
   trialAnalyze(diff: string, fingerprint: string): Promise<TrialReviewResult>;
 }
 

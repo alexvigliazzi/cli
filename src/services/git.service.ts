@@ -1,13 +1,20 @@
 import { simpleGit, SimpleGit } from 'simple-git';
 import fs from 'fs/promises';
 import path from 'path';
-import type { FileDiff, FileContent } from '../types/index.js';
+import type { FileDiff, FileContent, GitInfo, PlatformType } from '../types/index.js';
 
 class GitService {
   private git: SimpleGit;
 
   constructor() {
     this.git = simpleGit();
+  }
+
+  private async ensureRepo(): Promise<void> {
+    const isRepo = await this.isGitRepository();
+    if (!isRepo) {
+      throw new Error('Not a git repository. Run inside a Git repo or initialize one with "git init".');
+    }
   }
 
   async isGitRepository(): Promise<boolean> {
@@ -20,6 +27,7 @@ class GitService {
   }
 
   async getGitRoot(): Promise<string> {
+    await this.ensureRepo();
     return this.git.revparse(['--show-toplevel']);
   }
 
@@ -54,26 +62,31 @@ class GitService {
   }
 
   async getWorkingTreeDiff(): Promise<string> {
+    await this.ensureRepo();
     const staged = await this.git.diff(['--cached']);
     const unstaged = await this.git.diff();
     return `${staged}\n${unstaged}`.trim();
   }
 
   async getStagedDiff(): Promise<string> {
+    await this.ensureRepo();
     return this.git.diff(['--cached']);
   }
 
   async getDiffForCommit(commitSha: string): Promise<string> {
+    await this.ensureRepo();
     return this.git.diff([`${commitSha}^`, commitSha]);
   }
 
   async getDiffForBranch(branchName: string): Promise<string> {
+    await this.ensureRepo();
     // Compara branch atual contra branch especificado (ex: main)
     // Usa three-dot notation pra pegar diff desde o merge base
     return this.git.diff([`${branchName}...HEAD`]);
   }
 
   async getDiffForFiles(files: string[]): Promise<string> {
+    await this.ensureRepo();
     const diffs: string[] = [];
     
     for (const file of files) {
@@ -88,6 +101,7 @@ class GitService {
   }
 
   async getModifiedFiles(): Promise<FileDiff[]> {
+    await this.ensureRepo();
     const status = await this.git.status();
     const files: FileDiff[] = [];
 
@@ -134,6 +148,7 @@ class GitService {
     commit?: string;
     branch?: string;
   }): Promise<FileContent[]> {
+    await this.ensureRepo();
     // 1. Identificar arquivos a processar
     let filesToRead: string[];
 
@@ -213,6 +228,65 @@ class GitService {
 
   async getHeadCommit(): Promise<string> {
     return this.git.revparse(['HEAD']);
+  }
+
+  async getUserEmail(): Promise<string | undefined> {
+    try {
+      const email = await this.git.raw(['config', 'user.email']);
+      return email.trim() || undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  async getGitInfo(): Promise<GitInfo> {
+    const info: GitInfo = {
+      userEmail: undefined,
+      remote: undefined,
+      branch: undefined,
+      commitSha: undefined,
+    };
+
+    try {
+      info.userEmail = await this.getUserEmail();
+    } catch {
+      // Git config not set
+    }
+
+    try {
+      info.remote = await this.getRemoteUrl();
+    } catch {
+      // No remote configured
+    }
+
+    try {
+      info.branch = await this.getCurrentBranch();
+    } catch {
+      // Not on a branch (detached HEAD)
+    }
+
+    try {
+      info.commitSha = await this.getHeadCommit();
+    } catch {
+      // No commits yet
+    }
+
+    return info;
+  }
+
+  inferPlatform(remote: string | null | undefined): PlatformType {
+    if (!remote) return undefined;
+
+    const lowerRemote = remote.toLowerCase();
+
+    if (lowerRemote.includes('github.com')) return 'GITHUB';
+    if (lowerRemote.includes('gitlab.com')) return 'GITLAB';
+    if (lowerRemote.includes('bitbucket.org')) return 'BITBUCKET';
+    if (lowerRemote.includes('dev.azure.com') || lowerRemote.includes('visualstudio.com')) {
+      return 'AZURE_REPOS';
+    }
+
+    return undefined;
   }
 }
 
