@@ -3,18 +3,20 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../utils/config.js', () => ({
   loadConfig: vi.fn(),
   saveConfig: vi.fn(),
+  clearConfig: vi.fn(),
 }));
 
 vi.mock('../../utils/credentials.js', () => ({
   clearCredentials: vi.fn(),
 }));
 
-import { loadConfig, saveConfig } from '../../utils/config.js';
+import { clearConfig, loadConfig, saveConfig } from '../../utils/config.js';
 import { clearCredentials } from '../../utils/credentials.js';
 import { teamKeyAction, teamStatusAction } from '../auth/team-key.js';
 
 const mockLoadConfig = vi.mocked(loadConfig);
 const mockSaveConfig = vi.mocked(saveConfig);
+const mockClearConfig = vi.mocked(clearConfig);
 const mockClearCredentials = vi.mocked(clearCredentials);
 
 function mockProcessExit(): ReturnType<typeof vi.spyOn> {
@@ -86,8 +88,10 @@ describe('auth team-key command', () => {
     );
   });
 
-  it('does not fail when clearing old credentials throws', async () => {
+  it('fails and rolls back team config when clearing old credentials throws', async () => {
     const fetchMock = vi.mocked(fetch);
+    const exitSpy = mockProcessExit();
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     fetchMock.mockResolvedValue(
       new Response(
         JSON.stringify({
@@ -104,7 +108,10 @@ describe('auth team-key command', () => {
     );
     mockClearCredentials.mockRejectedValue(new Error('fs error'));
 
-    await expect(teamKeyAction({ key: 'kodus_abc123' })).resolves.toBeUndefined();
+    await expect(teamKeyAction({ key: 'kodus_abc123' })).rejects.toThrow('process.exit:1');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    expect(errorSpy).toHaveBeenCalled();
+    expect(mockClearConfig).toHaveBeenCalledTimes(1);
     expect(mockSaveConfig).toHaveBeenCalled();
   });
 

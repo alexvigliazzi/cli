@@ -1,5 +1,5 @@
 import chalk from 'chalk';
-import { loadConfig, saveConfig } from '../../utils/config.js';
+import { clearConfig, loadConfig, saveConfig } from '../../utils/config.js';
 import { clearCredentials } from '../../utils/credentials.js';
 import { API_URL } from '../../constants.js';
 
@@ -44,7 +44,8 @@ export async function teamKeyAction(options: { key?: string }): Promise<void> {
     try {
       await clearCredentials();
     } catch {
-      // Best effort cleanup.
+      await clearConfig().catch(() => {});
+      throw new Error('Failed to switch to team-key auth because personal credentials could not be cleared.');
     }
 
     console.log(chalk.green('✓ Authenticated successfully!'));
