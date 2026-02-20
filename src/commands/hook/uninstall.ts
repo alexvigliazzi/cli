@@ -12,21 +12,21 @@ export async function uninstallAction(): Promise<void> {
   }
 
   const gitRoot = await gitService.getGitRoot();
-  const hookPath = path.join(gitRoot.trim(), '.git', 'hooks', 'pre-commit');
+  const hookPath = path.join(gitRoot.trim(), '.git', 'hooks', 'pre-push');
 
   let content: string;
   try {
     content = await fs.readFile(hookPath, 'utf-8');
   } catch {
-    console.log(chalk.yellow('No pre-commit hook found.'));
+    console.log(chalk.yellow('No pre-push hook found.'));
     return;
   }
 
   if (!content.includes(KODUS_MARKER)) {
-    console.log(chalk.yellow('The pre-commit hook was not installed by kodus. Skipping.'));
+    console.log(chalk.yellow('The pre-push hook was not installed by kodus. Skipping.'));
     return;
   }
 
   await fs.unlink(hookPath);
-  console.log(chalk.green('✓ Pre-commit hook removed successfully.'));
+  console.log(chalk.green('✓ Pre-push hook removed successfully.'));
 }

@@ -9,6 +9,7 @@ import type {
 import { ApiError } from '../../types/index.js';
 import type { MemoryCaptureApiRequest, MemoryCaptureApiResponse } from '../../types/index.js';
 import type { IKodusApi, IAuthApi, IReviewApi, ITrialApi, IMemoryApi, GitMetrics } from './api.interface.js';
+import { getDeviceIdentity, updateDeviceToken } from '../../utils/device.js';
 
 /**
  * Validates and returns the API base URL
@@ -52,14 +53,102 @@ function getApiBaseUrl(): string {
 const API_BASE_URL = getApiBaseUrl();
 const REQUEST_TIMEOUT_MS = 20 * 60 * 1000; // 20 minutes
 
+interface ApiErrorPayload {
+  message?: string;
+  code?: string;
+  details?: {
+    limit?: number;
+    activeDevices?: number;
+  };
+}
+
+function getDefaultApiErrorMessage(statusCode: number, endpoint: string): string {
+  const endpointPath = endpoint.split('?')[0] || endpoint;
+
+  if (statusCode === 400) {
+    return `Invalid request sent to Kodus API (${endpointPath}).`;
+  }
+
+  if (statusCode === 401) {
+    if (endpointPath === '/pull-requests/suggestions') {
+      return 'Authentication failed while fetching pull request suggestions. Run: kodus auth login or configure a valid team key.';
+    }
+    return 'Authentication failed. Run: kodus auth login or configure a valid team key.';
+  }
+
+  if (statusCode === 403) {
+    return `Access denied for Kodus API endpoint (${endpointPath}).`;
+  }
+
+  if (statusCode === 404) {
+    return `Kodus API endpoint not found (${endpointPath}).`;
+  }
+
+  if (statusCode === 422) {
+    return `Kodus API could not process the request (${endpointPath}).`;
+  }
+
+  if (statusCode === 429) {
+    return 'Rate limit exceeded. Please try again later.';
+  }
+
+  if (statusCode >= 500) {
+    return 'Kodus API is currently unavailable. Please try again.';
+  }
+
+  return `Request failed with status ${statusCode}`;
+}
+
+function normalizeApiErrorMessage(statusCode: number, endpoint: string, errorData: ApiErrorPayload): string {
+  if (errorData.code === 'DEVICE_LIMIT_REACHED') {
+    const limit = errorData.details?.limit;
+    const activeDevices = errorData.details?.activeDevices;
+    if (typeof limit === 'number' && typeof activeDevices === 'number') {
+      return `Device limit reached (${activeDevices}/${limit}). Remove an old device or contact your admin.`;
+    }
+    return 'Device limit reached for this organization. Remove an old device or contact your admin.';
+  }
+
+  const fallbackMessage = getDefaultApiErrorMessage(statusCode, endpoint);
+  if (!errorData.message || typeof errorData.message !== 'string') {
+    return fallbackMessage;
+  }
+
+  // Keep auth/permission/server errors deterministic and always in CLI English.
+  if (statusCode === 401 || statusCode === 403 || statusCode === 404 || statusCode === 429 || statusCode >= 500) {
+    return fallbackMessage;
+  }
+
+  const trimmed = errorData.message.trim();
+  if (!trimmed) {
+    return fallbackMessage;
+  }
+
+  const hasNonAscii = /[^\x00-\x7F]/.test(trimmed);
+  if (hasNonAscii) {
+    return fallbackMessage;
+  }
+
+  return trimmed;
+}
+
 async function request<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`;
+  let deviceIdentity: { deviceId: string; deviceToken?: string } | undefined;
 
   if (process.env.KODUS_VERBOSE) {
     console.log(`[API] ${options.method || 'GET'} ${url}`);
+  }
+
+  try {
+    deviceIdentity = await getDeviceIdentity();
+  } catch (error) {
+    if (process.env.KODUS_VERBOSE) {
+      console.warn('[API] Unable to resolve device id:', error);
+    }
   }
 
   const controller = new AbortController();
@@ -72,6 +161,8 @@ async function request<T>(
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
+        ...(deviceIdentity?.deviceId ? { 'X-Kodus-Device-Id': deviceIdentity.deviceId } : {}),
+        ...(deviceIdentity?.deviceToken ? { 'X-Kodus-Device-Token': deviceIdentity.deviceToken } : {}),
         ...options.headers,
       },
     });
@@ -85,17 +176,34 @@ async function request<T>(
 
   clearTimeout(timeout);
 
+  const responseDeviceToken = response.headers.get('x-kodus-device-token');
+  if (responseDeviceToken) {
+    await updateDeviceToken(responseDeviceToken).catch(() => {});
+  }
+
   const contentType = response.headers.get('content-type') || '';
   const isJson = contentType.includes('application/json');
 
   if (!response.ok) {
-    const errorData = isJson
-      ? await response.json().catch(() => ({ message: 'Request failed' })) as { message?: string }
+    const rawError = isJson
+      ? await response.json().catch(() => ({ message: 'Request failed' }))
       : { message: `Request failed with status ${response.status}` };
-    const errorMessage = errorData.message || `Request failed with status ${response.status}`;
+    // Unwrap API envelope: errors may arrive as { data: { code, message, ... } }
+    // Only unwrap if the top-level object has no message/code of its own.
+    const errorData: ApiErrorPayload =
+      rawError && typeof rawError === 'object' && 'data' in rawError && rawError.data && typeof rawError.data === 'object' && !('message' in rawError) && !('code' in rawError)
+        ? rawError.data as ApiErrorPayload
+        : rawError as ApiErrorPayload;
+    const errorMessage = normalizeApiErrorMessage(response.status, endpoint, errorData);
 
     if (process.env.KODUS_VERBOSE) {
-      console.error('[API] Error:', { status: response.status, url, contentType, errorData });
+      console.error('[API] Error:', {
+        status: response.status,
+        url,
+        contentType,
+        errorData,
+        normalizedMessage: errorMessage,
+      });
     }
 
     throw new ApiError(response.status, errorMessage);
@@ -133,8 +241,8 @@ async function request<T>(
     }
   }
 
-  // API retorna { data: {...}, statusCode, type }
-  // Extrair apenas o .data se existir
+  // API usually returns { data: {...}, statusCode, type }
+  // Return only .data when present.
   if (json && typeof json === 'object' && 'data' in json) {
     return json.data as T;
   }
@@ -185,13 +293,13 @@ class RealAuthApi implements IAuthApi {
       body: JSON.stringify({ email, password }),
     });
 
-    // Mapear resposta da API para formato esperado pelo CLI
+    // Map API response into the CLI auth shape.
     return {
       accessToken: response.accessToken,
       refreshToken: response.refreshToken,
-      expiresIn: 3600, // Default: 1 hora
+      expiresIn: 3600, // Default: 1 hour
       user: {
-        id: 'unknown', // API não retorna user info no login
+        id: 'unknown', // Login response does not include user profile fields.
         email,
         orgs: [],
       },
@@ -366,10 +474,13 @@ class RealReviewApi implements IReviewApi {
 
     const queryString = query.toString();
     const endpoint = `/pull-requests/suggestions${queryString ? `?${queryString}` : ''}`;
+    const isTeamKey = accessToken.startsWith('kodus_');
 
     return requestWithRetry<PullRequestSuggestionsResponse>(endpoint, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...(isTeamKey
+          ? { 'X-Team-Key': accessToken }
+          : { Authorization: `Bearer ${accessToken}` }),
       },
     });
   }

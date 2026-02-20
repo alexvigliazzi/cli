@@ -42,7 +42,7 @@ afterEach(async () => {
 });
 
 function hookPath(): string {
-  return path.join(tmpDir, '.git', 'hooks', 'pre-commit');
+  return path.join(tmpDir, '.git', 'hooks', 'pre-push');
 }
 
 describe('hook install', () => {

@@ -214,14 +214,14 @@ class GitService {
     branch?: string;
   }): Promise<FileContent[]> {
     await this.ensureRepo();
-    // 1. Identificar arquivos a processar
+    // 1. Identify files to process
     let filesToRead: string[];
 
     // Map to track file statuses (A=added, M=modified, D=deleted, R=renamed)
     const fileStatusMap = new Map<string, FileDiff['status']>();
 
     if (explicitFiles && explicitFiles.length > 0) {
-      // Arquivos explícitos fornecidos
+      // Explicit files provided by the caller
       filesToRead = explicitFiles;
     } else if (options?.branch) {
       // Branch comparison: get files changed between branch and HEAD with status
@@ -260,44 +260,46 @@ class GitService {
       }
     }
 
-    // 2. Para cada arquivo, ler conteúdo E diff
+    // 2. For each file, read content and diff
     const fileContents: FileContent[] = [];
 
     for (const filePath of filesToRead) {
       try {
-        // Determinar status do arquivo
+        // Resolve file status
         const status = fileStatusMap.get(filePath) || 'modified';
 
-        // Pular arquivos deletados (não tem conteúdo)
+        // Skip deleted files (no content to read)
         if (status === 'deleted') continue;
 
-        // Pegar diff específico desse arquivo
+        // Read diff for this specific file
         let fileDiff: string;
         if (options?.branch) {
-          // Diff entre branch e HEAD
+          // Diff between target branch and HEAD
           fileDiff = await this.git.diff([`${options.branch}...HEAD`, '--', filePath]);
         } else if (options?.commit) {
-          // Diff do commit específico
+          // Diff for the selected commit
           fileDiff = await this.git.diff([`${options.commit}^`, options.commit, '--', filePath]);
         } else if (options?.staged) {
-          // Diff staged apenas
+          // Staged-only diff
           fileDiff = await this.git.diff(['--cached', '--', filePath]);
         } else {
-          // Diff completo (staged + unstaged)
+          // Full working-tree diff (staged + unstaged)
           const stagedDiff = await this.git.diff(['--cached', '--', filePath]);
           const unstagedDiff = await this.git.diff(['--', filePath]);
           fileDiff = `${stagedDiff}\n${unstagedDiff}`.trim();
         }
 
-        // Ler conteúdo do arquivo
+        // Read file content
         let content: string;
 
         if (options?.commit) {
-          // Ler do commit específico
+          // Read file content from the selected commit
           content = await this.git.show([`${options.commit}:${filePath}`]);
+        } else if (options?.branch) {
+          // Read file content from HEAD to match the branch comparison diff target.
+          content = await this.git.show([`HEAD:${filePath}`]);
         } else {
-          // Ler do working tree (fs.readFile)
-          // Para branch comparison, lê a versão atual (HEAD)
+          // Read from working tree (fs.readFile)
           const fullPath = path.resolve(filePath);
           content = await fs.readFile(fullPath, 'utf-8');
         }
@@ -309,7 +311,7 @@ class GitService {
           diff: fileDiff,
         });
       } catch (error) {
-        // Arquivo pode ser binário ou inacessível - pular silenciosamente
+        // File may be binary or inaccessible; skip silently.
         continue;
       }
     }

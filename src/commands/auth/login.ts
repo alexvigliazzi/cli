@@ -16,13 +16,18 @@ export async function loginAction(options: LoginOptions): Promise<void> {
     
     if (isAuthenticated && !options.email) {
       const credentials = await authService.getCredentials();
-      console.log(chalk.yellow(`\nAlready logged in as ${credentials?.user.email}`));
+      const email = credentials?.user?.email;
+      console.log(
+        chalk.yellow(email ? `\nAlready logged in as ${email}` : '\nAlready authenticated with team key'),
+      );
       
       const { confirm } = await inquirer.prompt([
         {
           type: 'confirm',
           name: 'confirm',
-          message: 'Do you want to login with a different account?',
+          message: email
+            ? 'Do you want to login with a different account?'
+            : 'Do you want to login with an account instead?',
           default: false,
         },
       ]);

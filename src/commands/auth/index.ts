@@ -17,7 +17,7 @@ authCommand
 
 authCommand
   .command('logout')
-  .description('Remove local credentials')
+  .description('Remove local authentication (login and team key)')
   .action(logoutAction);
 
 authCommand
@@ -40,4 +40,3 @@ authCommand
   .command('team-status')
   .description('Show team authentication status')
   .action(teamStatusAction);
-

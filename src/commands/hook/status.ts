@@ -12,22 +12,22 @@ export async function statusAction(): Promise<void> {
   }
 
   const gitRoot = await gitService.getGitRoot();
-  const hookPath = path.join(gitRoot.trim(), '.git', 'hooks', 'pre-commit');
+  const hookPath = path.join(gitRoot.trim(), '.git', 'hooks', 'pre-push');
 
   let content: string;
   try {
     content = await fs.readFile(hookPath, 'utf-8');
   } catch {
-    console.log(chalk.yellow('Pre-commit hook: not installed'));
+    console.log(chalk.yellow('Pre-push hook: not installed'));
     return;
   }
 
   if (!content.includes(KODUS_MARKER)) {
-    console.log(chalk.yellow('Pre-commit hook: installed (not by kodus)'));
+    console.log(chalk.yellow('Pre-push hook: installed (not by kodus)'));
     return;
   }
 
-  console.log(chalk.green('Pre-commit hook: installed'));
+  console.log(chalk.green('Pre-push hook: installed'));
 
   // Parse config from hook script
   const failOnMatch = content.match(/--fail-on\s+(\S+)/);

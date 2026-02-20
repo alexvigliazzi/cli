@@ -4,7 +4,7 @@ import {
   saveCredentials,
   clearCredentials,
 } from '../utils/credentials.js';
-import { loadConfig } from '../utils/config.js';
+import { loadConfig, clearConfig } from '../utils/config.js';
 import type { StoredCredentials, AuthResponse } from '../types/index.js';
 import { AuthError } from '../types/index.js';
 
@@ -12,10 +12,17 @@ const TOKEN_REFRESH_BUFFER_MS = 5 * 60 * 1000;
 
 class AuthService {
   private cachedCredentials: StoredCredentials | null = null;
+  private refreshInFlight: Promise<string> | null = null;
 
   async login(email: string, password: string): Promise<void> {
     const response = await api.auth.login(email, password);
     await this.storeAuthResponse(response);
+    // Successful login switches auth mode to user credentials.
+    try {
+      await clearConfig();
+    } catch {
+      // Best effort cleanup.
+    }
   }
 
   async logout(): Promise<void> {
@@ -29,7 +36,7 @@ class AuthService {
       }
     }
 
-    await clearCredentials();
+    await Promise.all([clearCredentials(), clearConfig()]);
     this.cachedCredentials = null;
   }
 
@@ -51,32 +58,24 @@ class AuthService {
   }
 
   async getValidToken(): Promise<string> {
+    const credentials = await this.getCredentials();
+
+    if (credentials) {
+      const isExpired = Date.now() > credentials.expiresAt - TOKEN_REFRESH_BUFFER_MS;
+
+      if (isExpired) {
+        return this.refreshTokenOrFallback(credentials.refreshToken);
+      }
+
+      return credentials.accessToken;
+    }
+
     const config = await loadConfig();
     if (config?.teamKey) {
       return config.teamKey;
     }
 
-    const credentials = await this.getCredentials();
-
-    if (!credentials) {
-      throw new AuthError('Not authenticated. Run: kodus auth login or kodus auth team-key --key <your-key>');
-    }
-
-    const isExpired = Date.now() > credentials.expiresAt - TOKEN_REFRESH_BUFFER_MS;
-
-    if (isExpired) {
-      try {
-        const response = await api.auth.refresh(credentials.refreshToken);
-        await this.storeAuthResponse(response);
-        return response.accessToken;
-      } catch (error) {
-        await clearCredentials();
-        this.cachedCredentials = null;
-        throw new AuthError('Session expired. Run: kodus auth login');
-      }
-    }
-
-    return credentials.accessToken;
+    throw new AuthError('Not authenticated. Run: kodus auth login or kodus auth team-key --key <your-key>');
   }
 
   async generateCIToken(): Promise<string> {
@@ -105,8 +104,35 @@ class AuthService {
     await saveCredentials(credentials);
     this.cachedCredentials = credentials;
   }
+
+  private async refreshTokenOrFallback(refreshToken: string): Promise<string> {
+    if (!this.refreshInFlight) {
+      this.refreshInFlight = (async () => {
+        try {
+          const response = await api.auth.refresh(refreshToken);
+          await this.storeAuthResponse(response);
+          return response.accessToken;
+        } catch (error) {
+          await clearCredentials();
+          this.cachedCredentials = null;
+
+          const config = await loadConfig();
+          if (config?.teamKey) {
+            return config.teamKey;
+          }
+
+          throw new AuthError('Session expired. Run: kodus auth login');
+        }
+      })();
+    }
+
+    try {
+      return await this.refreshInFlight;
+    } finally {
+      this.refreshInFlight = null;
+    }
+  }
 }
 
 export { AuthService };
 export const authService = new AuthService();
-

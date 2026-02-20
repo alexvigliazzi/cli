@@ -11,6 +11,10 @@ export interface CliConfig {
   organizationName: string;
 }
 
+function isJsonParseError(error: unknown): boolean {
+  return error instanceof SyntaxError;
+}
+
 async function ensureConfigDir(): Promise<void> {
   try {
     await fs.mkdir(CONFIG_DIR, { recursive: true, mode: 0o700 });
@@ -23,10 +27,11 @@ async function ensureConfigDir(): Promise<void> {
 
 export async function saveConfig(config: CliConfig): Promise<void> {
   await ensureConfigDir();
-  await fs.writeFile(CONFIG_FILE, JSON.stringify(config, null, 2), {
-    encoding: 'utf-8',
-    mode: 0o600,
-  });
+  const tmpFile = `${CONFIG_FILE}.${process.pid}.${Date.now()}.tmp`;
+  const content = JSON.stringify(config, null, 2);
+
+  await fs.writeFile(tmpFile, content, { encoding: 'utf-8', mode: 0o600 });
+  await fs.rename(tmpFile, CONFIG_FILE);
 }
 
 export async function loadConfig(): Promise<CliConfig | null> {
@@ -34,9 +39,18 @@ export async function loadConfig(): Promise<CliConfig | null> {
     const content = await fs.readFile(CONFIG_FILE, 'utf-8');
     return JSON.parse(content) as CliConfig;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+    const code = (error as NodeJS.ErrnoException).code;
+    if (code === 'ENOENT') {
       return null;
     }
+
+    // Self-heal malformed JSON by isolating the broken file and treating as no config.
+    if (isJsonParseError(error)) {
+      const brokenFile = `${CONFIG_FILE}.corrupted.${Date.now()}`;
+      await fs.rename(CONFIG_FILE, brokenFile).catch(() => {});
+      return null;
+    }
+
     throw error;
   }
 }

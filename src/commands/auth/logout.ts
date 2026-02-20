@@ -9,7 +9,7 @@ export async function logoutAction(): Promise<void> {
     const isAuthenticated = await authService.isAuthenticated();
     
     if (!isAuthenticated) {
-      console.log(chalk.yellow('\nNot logged in.'));
+      console.log(chalk.yellow('\nNot authenticated.'));
       return;
     }
 
@@ -27,4 +27,3 @@ export async function logoutAction(): Promise<void> {
     process.exit(1);
   }
 }
-
