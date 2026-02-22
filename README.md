@@ -1,250 +1,139 @@
-# Kodus CLI
+<!-- TODO: Add banner image/logo here -->
 
-AI-powered code review from your terminal.
+<h1 align="center">Kodus CLI</h1>
 
-## Installation
+<p align="center">
+  <strong>Catch bugs before they reach your pull request — AI code review from the terminal.</strong>
+</p>
 
-### npm (Recommended)
+<p align="center">
+  <a href="https://www.npmjs.com/package/@kodus/cli"><img src="https://img.shields.io/npm/v/@kodus/cli.svg" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@kodus/cli"><img src="https://img.shields.io/npm/dm/@kodus/cli.svg" alt="npm downloads"></a>
+  <a href="https://github.com/kodustech/cli/blob/main/LICENSE"><img src="https://img.shields.io/github/license/kodustech/cli" alt="license"></a>
+  <a href="https://github.com/kodustech/cli"><img src="https://img.shields.io/github/stars/kodustech/cli" alt="stars"></a>
+  <a href="https://nodejs.org"><img src="https://img.shields.io/badge/node-%3E%3D18-brightgreen" alt="node version"></a>
+</p>
+
+<p align="center">
+  <a href="https://kodus.io">Website</a> &middot;
+  <a href="https://app.kodus.io">Sign Up</a> &middot;
+  <a href="https://github.com/kodustech/cli/issues">Issues</a>
+</p>
+
+---
 
 ```bash
 npm install -g @kodus/cli
 ```
 
-### Via curl
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/kodustech/cli/main/install.sh | bash
-```
-
-### Homebrew (Coming soon)
-
-```bash
-brew install kodus/tap/kodus
-```
-
-### Using npx (No installation)
-
-```bash
-npx @kodus/cli review
-```
+---
 
 ## Quick Start
 
 ```bash
-# Run an interactive review (default mode)
-kodus review
+# 1. Install
+npm install -g @kodus/cli
 
-# Run a review on staged files (interactive)
-kodus review --staged
-
-# Run a review on a specific commit (interactive)
-kodus review --commit HEAD~1
-
-# Run a review comparing against another branch (interactive)
-kodus review --branch main
-
-# Run a review on specific files (interactive)
-kodus review src/index.ts src/utils.ts
-
-# Review using only configured rules (no general suggestions)
-kodus review --rules-only
-
-# Fast mode: quicker analysis (good for large diffs)
-kodus review --fast
-
-# Auto-fix: apply all fixable issues automatically
-kodus review --fix
-
-# Non-interactive modes:
-# - JSON output
-kodus review --format json
-
-# - Markdown report
-kodus review --format markdown
-
-# - AI Agent mode (optimized for Claude Code, Cursor, etc)
-kodus review --prompt-only
-```
-
-## Authentication
-
-Sign up at **https://app.kodus.io** to create your account.
-
-```bash
-# Login with your account
+# 2. Authenticate (or skip for trial mode — no account needed)
 kodus auth login
 
-# Check authentication status
-kodus auth status
-
-# Logout
-kodus auth logout
-
-# Generate CI/CD token
-kodus auth token
-```
-
-## Review Modes
-
-### Interactive Mode (Default)
-Navigate through issues and apply fixes interactively:
-
-```bash
-# Interactive mode is now the default
+# 3. Review your code
 kodus review
-
-# You can also explicitly enable it
-kodus review --interactive
-kodus review -i
 ```
 
-Features:
-- **File-first navigation**: Browse files with issue counts
-- **Copy fix prompt**: Generate AI-friendly prompts for Claude Code, Cursor, etc.
-- **One-by-one review**: See issues with detailed information
-- **Preview fixes**: View changes before applying
-- **Apply fixes**: Choose which fixes to apply
-- **Live progress**: Track fixed vs remaining issues
+That's it. Kodus analyzes your changes, finds issues, and lets you fix them interactively — or auto-fix everything at once with `kodus review --fix`.
 
-### Auto-fix Mode
-Automatically apply all fixable issues:
+<!-- TODO: Add demo GIF showing interactive review in action -->
+
+## What It Does
+
+### Code Review
+
+Analyze local changes, staged files, commits, or branch diffs. Kodus finds bugs, security issues, performance problems, and style violations — then suggests fixes with real code.
 
 ```bash
-kodus review --fix
+kodus review                    # Review working tree changes (interactive)
+kodus review --staged           # Only staged files
+kodus review --branch main      # Compare against a branch
+kodus review --fix              # Auto-apply all fixable issues
+kodus review --prompt-only      # Structured output for AI agents
 ```
 
-Features:
-- Applies all auto-fixable issues at once
-- Shows confirmation prompt before applying
-- Reports success/failure for each fix
+Reviews are **context-aware** — Kodus reads your `.cursorrules`, `claude.md`, and `.kodus.md` so suggestions follow your team's standards. [More on review modes](#review-modes)
 
-### AI Agent Mode
-Optimized for AI coding agents (Claude Code, Cursor, Windsurf):
+### PR Suggestions
+
+Fetch AI-powered suggestions for open pull requests directly from your terminal.
 
 ```bash
-kodus review --prompt-only
+kodus pr suggestions --pr-url https://github.com/org/repo/pull/42
+kodus pr suggestions --pr-number 42 --repo-id <id>
 ```
 
-Features:
-- Minimal, structured output
-- Easy to parse programmatically
-- Includes fix code for auto-fixable issues
-- Perfect for autonomous generate-review-fix loops
+Filter by severity, export as JSON or Markdown, or pipe into an AI agent with `--prompt-only` for automated fixes.
 
-## Output Formats
+### Decision Memory
+
+AI agents make dozens of decisions per session — architecture choices, trade-offs, why approach X was picked over Y. Without a record, that reasoning vanishes when the session ends.
+
+Kodus captures agent decisions into your repo as structured markdown. When you or another agent return to the code, the full context is there.
 
 ```bash
-# Interactive mode (default)
-kodus review
-
-# JSON output (non-interactive)
-kodus review --format json
-
-# Markdown report (non-interactive)
-kodus review --format markdown
-
-# AI Agent output (non-interactive)
-kodus review --prompt-only
-
-# Save to file (non-interactive)
-kodus review --format markdown --output report.md
-
-# Terminal output without interactivity
-kodus review --format terminal --output report.txt
+kodus decisions enable           # Install hooks + initialize config
+kodus decisions status           # See what's been captured
+kodus decisions show [name]      # View PR or module memory
+kodus decisions promote          # Promote decisions to long-term memory
 ```
 
-## Context-Aware Reviews
+Stored in `.kody/pr/by-sha/<head-sha>.md` — versioned with your code, readable by humans and agents. [More on decision memory](#decision-memory-1)
 
-Kodus CLI automatically reads your project's context files to provide better, more relevant reviews:
+---
 
-**Auto-detected files:**
-- `.cursorrules` - Cursor IDE rules
-- `claude.md` / `.claude.md` - Claude Code guidelines
-- `.kodus.md` / `.kodus/rules.md` - Kodus-specific rules
+## Best With AI Agents
 
-**Custom context:**
-```bash
-# Include custom context file
-kodus review --context path/to/custom-guidelines.md
-```
+Kodus is designed to work **inside AI coding agents**. While you can use it standalone, the real power comes when your agent runs reviews automatically and fixes issues in a loop — no manual intervention needed.
 
-This ensures reviews follow your team's standards, coding patterns, and architectural preferences.
+**Works with:** Claude Code, Cursor, Windsurf, GitHub Copilot, Gemini CLI, and [20+ more environments](https://review-skill.com/).
 
-### Flags
+### Install the Skill (recommended)
 
-| Flag | Description | Use Case |
-|------|-------------|----------|
-| (none) | Interactive mode (default) | Local development, manual review |
-| `--rules-only` | Only check configured rules | Team standards, CI/CD |
-| `--fast` | Faster analysis with lighter checks | Large diffs, quick feedback |
-| `--staged` | Analyze only staged files | Pre-commit |
-| `--interactive` / `-i` | Explicitly enable interactive mode | When combined with other flags |
-| `--fix` | Auto-apply all fixable issues | Quick fixes, automation |
-| `--prompt-only` | AI agent optimized output | Claude Code, Cursor integration |
-| `--context <file>` | Include custom context file | Project-specific guidelines |
-| `--format json` | Output as JSON (non-interactive) | Automation, integrations |
-| `--output <file>` | Save to file (non-interactive) | Reports, CI/CD artifacts |
-
-**Examples:**
+The fastest way to get started. Auto-detects your installed IDEs and sets everything up:
 
 ```bash
-# Pre-commit: interactive check on staged files (default)
-kodus review --staged
-
-# CI/CD: strict rules only, JSON output
-kodus review --rules-only --format json
-
-# Quick feedback on large changes (still interactive)
-kodus review --fast
-
-# Auto-fix all issues in staged files
-kodus review --staged --fix
-
-# AI agent workflow (non-interactive)
-kodus review --prompt-only
-
-# Custom context with interactive mode (default)
-kodus review --context .github/GUIDELINES.md
-
-# Copy fix prompts and paste into Claude Code
-kodus review  # Select file → "Copy fix prompt for AI agent"
+curl -fsSL https://review-skill.com/install | bash
 ```
 
-## AI Agent Integration
+This installs the Kodus CLI globally and deploys the review skill into every supported agent on your machine — Claude Code, Cursor, Windsurf, and others. One command, all environments.
 
-Kodus CLI works seamlessly with AI coding agents like **Claude Code**, **Cursor**, and **Windsurf**.
+### How It Works With Agents
 
-### Interactive Mode with Copy Prompt (Recommended)
+Once installed, your AI agent can autonomously:
 
-The easiest way to use with AI agents:
+1. **Write code** as usual
+2. **Run `kodus review --prompt-only`** to analyze changes
+3. **Read the structured output** and understand each issue
+4. **Fix the issues** automatically
+5. **Repeat** until the review is clean
 
-```bash
-# 1. Run interactive review
-kodus review
+This creates a tight feedback loop: the agent writes, reviews, and fixes — all without leaving your IDE.
 
-# 2. Navigate to a file with issues
-# 3. Select "Copy fix prompt for AI agent"
-# 4. Paste into Claude Code/Cursor
-# 5. AI automatically fixes the issues
+Beyond reviews, Kodus also captures **what your agent decided and why** via [Decision Memory](#decision-memory). Every reasoning step is saved into your repo — so when you (or another agent) pick up the work later, the full context is already there. No more re-explaining what was done or losing decisions between sessions.
+
+### Setup: Claude Code
+
+Add to your project's `CLAUDE.md`:
+
+```markdown
+## Code Review
+After implementing changes, run `kodus review --prompt-only` to check for issues.
+If issues are found, fix them and re-run until clean.
 ```
 
-The copied prompt includes:
-- File path
-- All issues with line numbers and severity
-- Detailed suggestions and recommendations
-- AI-optimized formatting
+Or use the skill directly — after installing via the command above, just ask Claude Code to review your code and it will use Kodus automatically.
 
-### Automated Mode with --prompt-only
+### Setup: Cursor / Windsurf
 
-For fully automated workflows:
-
-Set your team key as an environment variable:
-
-```bash
-export KODUS_TEAM_KEY=kodus_xxxxx
-```
-
-Add this to your `.cursorrules` or prompt:
+Add to your `.cursorrules` or equivalent:
 
 ```
 When writing code:
@@ -255,117 +144,277 @@ When writing code:
 5. Show final result
 ```
 
-Claude Code will automatically run reviews and fix issues in a loop.
+### Setup: Headless / Shared Environments
 
-### Using with Cursor
-
-Similar workflow - the AI agent can autonomously:
-- Generate code
-- Review with `kodus review --prompt-only`
-- Parse the structured output
-- Apply fixes
-- Iterate until clean
-
-### Benefits
-- ✅ Catch issues during development, not after
-- ✅ Autonomous fix loops (no manual intervention)
-- ✅ Consistent with team standards
-- ✅ Faster development cycles
-
-## Decision Memory (MVP)
-
-Capture agent decisions into repository-local markdown files (`.kody/pr/by-sha/<head-sha>.md`).
+Set a team key so agents and shared machines are authenticated without individual logins:
 
 ```bash
-# Enable decisions: installs all hooks + initializes module config
-kodus decisions enable
-
-# Optional: choose agents explicitly
-kodus decisions enable --agents claude,cursor,codex
-
-# Optional: custom Codex config path
-kodus decisions enable --agents codex --codex-config ~/.codex/config.toml
-
-# Overwrite existing modules.yml
-kodus decisions enable --force
-
-# Disable decisions: removes hooks (preserves .kody/ data)
-kodus decisions disable
-
-# Check current branch memory status
-kodus decisions status
-
-# Show PR memory or module memory
-kodus decisions show [name]
-
-# Promote PR decisions to module memory
-kodus decisions promote --branch <name> --modules <ids>
+export KODUS_TEAM_KEY=kodus_xxxxx
+kodus review --prompt-only
 ```
 
-The capture command is internal and invoked by hooks:
+Works with Codex, CI runners, remote dev environments, and any context where personal login isn't practical. Get your key at [app.kodus.io/settings/cli](https://app.kodus.io/settings/cli).
+
+### Copy & Paste Workflow (interactive)
+
+If you prefer manual control:
+
+1. Run `kodus review`
+2. Navigate to a file with issues
+3. Select **"Copy fix prompt for AI agent"**
+4. Paste into Claude Code or Cursor — the AI fixes it
+
+The copied prompt includes file path, line numbers, severity, and detailed suggestions — optimized for AI agents.
+
+## Installation
+
+### Skill installer (recommended — CLI + all your agents)
 
 ```bash
-kodus decisions capture '{"turn_id":"turn-1"}' --agent codex --event agent-turn-complete
+curl -fsSL https://review-skill.com/install | bash
 ```
 
-## Trial Mode
+Installs the CLI and deploys the review skill to all detected agents in one step.
 
-Without an account, you can use the CLI with rate limits:
+### CLI only
 
-- 5 reviews per day
-- 10 files per review
-- 500 lines per file
-
-Sign up for free to remove these limits.
-
-## Development
+<details>
+<summary><strong>npm</strong></summary>
 
 ```bash
-# Install dependencies
-npm install
-
-# Build
-npm run build
-
-# Run in development
-npm run dev
-
-# Test locally
-node dist/index.js review
+npm install -g @kodus/cli
 ```
+</details>
 
-## Environment Variables
-
-| Variable | Description | Security Notes |
-|----------|-------------|----------------|
-| `KODUS_API_URL` | API endpoint (default: https://api.kodus.io) | ⚠️ Only HTTPS URLs accepted (except localhost). Custom URLs validated for security. |
-| `KODUS_VERBOSE` | Set to `true` to enable verbose logging | ⚠️ **DO NOT use in production/CI** - may expose sensitive data in logs |
-| `KODUS_TOKEN` | CI/CD token for non-interactive environments | - |
-| `KODUS_TEAM_KEY` | Team authentication key for AI coding agents (Codex, Claude Code, Cursor) | - |
-
-### Verbose Mode
-
-Enable detailed logging for debugging purposes:
+<details>
+<summary><strong>npx (no install)</strong></summary>
 
 ```bash
-# Enable verbose logging
-export KODUS_VERBOSE=true
+npx @kodus/cli review
+```
+</details>
+
+<details>
+<summary><strong>curl</strong></summary>
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/kodustech/cli/main/install.sh | bash
+```
+</details>
+
+<details>
+<summary><strong>Homebrew (coming soon)</strong></summary>
+
+```bash
+brew install kodus/tap/kodus
+```
+</details>
+
+## Review Modes
+
+### Interactive (default)
+
+```bash
 kodus review
 ```
 
-**⚠️ Security Warning:** Verbose mode may log sensitive information including:
-- API responses and errors
-- Authentication token details
-- Full request/response payloads
+Navigate files with issue counts, preview fixes before applying, and copy AI-friendly prompts to paste into Claude Code or Cursor.
 
-**Never use verbose mode in:**
-- Production environments
-- CI/CD pipelines
-- Shared or public logs
-- Automated workflows
+### Auto-fix
 
-Verbose mode is intended **only for local development and debugging**.
+```bash
+kodus review --fix
+```
+
+Applies all fixable issues at once. Shows a confirmation prompt before making changes.
+
+### AI Agent
+
+```bash
+kodus review --prompt-only
+```
+
+Minimal, structured output designed for Claude Code, Cursor, and Windsurf. Perfect for autonomous generate-review-fix loops.
+
+<details>
+<summary><strong>More: output formats &amp; flags</strong></summary>
+
+#### Output Formats
+
+```bash
+kodus review                           # Interactive (default)
+kodus review --format json             # JSON output
+kodus review --format markdown         # Markdown report
+kodus review --prompt-only             # AI agent output
+kodus review --format markdown -o report.md  # Save to file
+```
+
+#### Diff Targets
+
+```bash
+kodus review                           # Working tree changes
+kodus review --staged                  # Staged files only
+kodus review --commit HEAD~1           # Specific commit
+kodus review --branch main             # Compare against branch
+kodus review src/index.ts src/utils.ts # Specific files
+```
+
+#### All Flags
+
+| Flag | Description |
+|------|-------------|
+| `--staged` | Analyze only staged files |
+| `--commit <sha>` | Analyze a specific commit |
+| `--branch <name>` | Compare against a branch |
+| `--rules-only` | Only check configured rules |
+| `--fast` | Faster analysis for large diffs |
+| `--fix` | Auto-apply all fixable issues |
+| `--prompt-only` | AI agent optimized output |
+| `--context <file>` | Include custom context file |
+| `--format <fmt>` | Output format: `terminal`, `json`, `markdown` |
+| `--output <file>` | Save output to file |
+| `--fail-on <severity>` | Exit code 1 if issues meet or exceed severity |
+| `-i, --interactive` | Explicitly enable interactive mode |
+
+</details>
+
+## Decision Memory
+
+Full reference for the decision capture system ([intro above](#decision-memory)).
+
+```bash
+# Enable with specific agents
+kodus decisions enable --agents claude,cursor,codex
+
+# Custom Codex config path
+kodus decisions enable --agents codex --codex-config ~/.codex/config.toml
+
+# Overwrite existing config
+kodus decisions enable --force
+
+# Check what's been captured on current branch
+kodus decisions status
+
+# View decisions for a PR or specific module
+kodus decisions show [name]
+
+# Promote PR-level decisions to long-term module memory
+kodus decisions promote --branch feat/auth --modules auth,users
+
+# Disable hooks (preserves all captured data in .kody/)
+kodus decisions disable
+```
+
+**How it works:** Hooks fire on agent turn-complete events and persist decisions to `.kody/pr/by-sha/<head-sha>.md`. Files are committed to your repo, versioned with your code, readable by humans and agents.
+
+**Supported agents:** Claude Code, Cursor, Codex.
+
+## CI/CD & Git Hooks
+
+### Pre-push Hook
+
+```bash
+kodus hook install --fail-on error   # Block pushes with errors
+kodus hook status                     # Check hook status
+kodus hook uninstall                  # Remove hook
+```
+
+### Pipeline Usage
+
+```bash
+# Strict rules check with JSON output
+kodus review --rules-only --format json --fail-on error
+
+# Generate markdown report artifact
+kodus review --format markdown --output review-report.md
+```
+
+## Authentication
+
+Kodus supports multiple auth methods depending on your setup:
+
+### Trial Mode (no account)
+
+Just run `kodus review`. No signup needed. You get 5 reviews/day with up to 10 files and 500 lines per file — enough to try it out. [Sign up free](https://app.kodus.io) to remove limits.
+
+### Personal Login
+
+For individual developers. Creates a session with automatic token refresh.
+
+```bash
+kodus auth login           # Sign in with email/password
+kodus auth status          # Check auth status and usage
+kodus auth logout          # Sign out
+```
+
+Credentials are stored locally in `~/.kodus/credentials.json`.
+
+### Team Key
+
+For teams where not everyone needs their own account. A single shared key gives the whole team access — developers just set the key and start reviewing, no individual signup required.
+
+```bash
+kodus auth team-key --key kodus_xxxxx
+```
+
+Or set it as an environment variable:
+
+```bash
+export KODUS_TEAM_KEY=kodus_xxxxx
+```
+
+Get your team key at [app.kodus.io/settings/cli](https://app.kodus.io/settings/cli). Team keys have configurable device limits managed from the dashboard.
+
+This is also the recommended auth method for AI coding agents (Claude Code, Cursor, Codex) — set the env var once and every agent session is authenticated automatically.
+
+### CI/CD Token
+
+For pipelines and automated environments. Generated from your personal login:
+
+```bash
+kodus auth token           # Generate a CI/CD token
+```
+
+Then use it in your pipeline:
+
+```bash
+export KODUS_TOKEN=<your-token>
+kodus review --format json --fail-on error
+```
+
+> **Note:** For PR-level reviews in CI/CD, we recommend using the [Kodus platform](https://app.kodus.io) GitHub/GitLab integration instead of the CLI. It's purpose-built for PR workflows with inline comments, status checks, and team dashboards.
+
+<details>
+<summary><strong>Environment variables</strong></summary>
+
+| Variable | Description |
+|----------|-------------|
+| `KODUS_API_URL` | API endpoint (default: `https://api.kodus.io`). HTTPS only (except localhost). |
+| `KODUS_TOKEN` | CI/CD token for automated pipelines (generated via `kodus auth token`) |
+| `KODUS_TEAM_KEY` | Team key for shared team access and AI coding agents |
+
+</details>
+
+## Privacy & Security
+
+Kodus sends your code diffs to the Kodus API for analysis. We take this seriously:
+
+- **HTTPS only** — All API communication is encrypted. Custom API URLs are validated.
+- **No training on your code** — Your code is not used to train models.
+- **Minimal data** — Only diffs and context files are sent, not your entire codebase.
+- **Credentials stored locally** — Auth tokens are kept in `~/.kodus/credentials.json` on your machine.
+
+## Contributing
+
+We welcome contributions! Please see our [issues page](https://github.com/kodustech/cli/issues) to get started.
+
+```bash
+npm install       # Install dependencies
+npm run build     # Build
+npm run dev       # Watch mode
+npm test          # Run tests
+```
 
 ## License
 
-MIT
+[MIT](LICENSE)
