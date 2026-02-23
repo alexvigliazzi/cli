@@ -18,7 +18,7 @@ export const CLAUDE_CAPTURE_COMMANDS = {
 };
 
 export const CODEX_NOTIFY_LINE =
-  'notify = ["kodus", "decisions", "capture", "--agent", "codex", "--event", "agent-turn-complete"]';
+  'notify = ["kodus", "decisions", "capture", "--agent", "codex", "--event", "stop"]';
 
 export const MERGE_HOOK_MARKER = '# kodus-memory-post-merge';
 const MERGE_HOOK_END_MARKER = '# /kodus-memory-post-merge';
