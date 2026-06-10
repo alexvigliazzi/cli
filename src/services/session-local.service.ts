@@ -10,6 +10,15 @@ export interface LocalSessionData {
 const SESSION_DIR = '.kody/sessions';
 
 function sessionPath(repoRoot: string, sessionId: string): string {
+  if (
+    !sessionId ||
+    path.isAbsolute(sessionId) ||
+    sessionId !== path.basename(sessionId) ||
+    sessionId.includes('/') ||
+    sessionId.includes('\\')
+  ) {
+    throw new Error('Invalid session id for local session storage');
+  }
   return path.join(repoRoot, SESSION_DIR, `${sessionId}.json`);
 }
 

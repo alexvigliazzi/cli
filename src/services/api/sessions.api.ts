@@ -8,6 +8,7 @@ import type { ISessionsApi } from './api.interface.js';
 const PENDING_FILE = '.kody/pending-events.jsonl';
 const MAX_BUFFER_LINES = 1000;
 const ENDPOINT = '/cli/sessions/events';
+const memoryPendingEvents: Array<{ repoRoot: string; event: SessionApiEvent }> = [];
 
 async function getAuthToken(): Promise<string | null> {
   try {
@@ -48,6 +49,11 @@ async function writePending(repoRoot: string, lines: string[]): Promise<void> {
   const truncated = lines.length > MAX_BUFFER_LINES
     ? lines.slice(lines.length - MAX_BUFFER_LINES)
     : lines;
+  if (truncated.length < lines.length && process.env.KODUS_VERBOSE) {
+    console.error(
+      `[sessions] Pending buffer truncated from ${lines.length} to ${MAX_BUFFER_LINES} events; dropped ${lines.length - truncated.length}.`,
+    );
+  }
 
   await fs.writeFile(filePath, truncated.join('\n') + '\n', 'utf-8');
 }
@@ -124,7 +130,15 @@ export class RealSessionsApi implements ISessionsApi {
         return;
       }
       // Network or retryable — buffer locally
-      await appendPending(repoRoot, event).catch(() => {});
+      try {
+        await appendPending(repoRoot, event);
+      } catch (appendError) {
+        memoryPendingEvents.push({ repoRoot, event });
+        if (process.env.KODUS_VERBOSE) {
+          const message = appendError instanceof Error ? appendError.message : String(appendError);
+          console.error(`[sessions] Failed to persist pending event for ${repoRoot}: ${message}`);
+        }
+      }
     }
   }
 }

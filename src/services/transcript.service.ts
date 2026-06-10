@@ -14,7 +14,7 @@ class TranscriptService {
   /**
    * Parse a JSONL transcript file from disk.
    * @param transcriptPath Absolute path to the .jsonl file.
-   * @param fromOffset Start parsing from this character offset (for incremental).
+   * @param fromOffset Start parsing from this byte offset (for incremental).
    */
   async parse(transcriptPath: string, fromOffset = 0): Promise<TranscriptParseResult> {
     const result: TranscriptParseResult = {
@@ -45,7 +45,7 @@ class TranscriptService {
       throw error;
     }
 
-    const lines = content.slice(fromOffset).split('\n');
+    const lines = sliceFromByteOffset(content, fromOffset).split('\n');
 
     for (const line of lines) {
       const trimmed = line.trim();
@@ -63,16 +63,16 @@ class TranscriptService {
       // Handle top-level entries with message field
       const message = entry['message'] as Record<string, unknown> | undefined;
       if (message) {
-        this.processMessage(message, result, modifiedFilesSet, filesReadSet, (text) => {
-          lastAssistantText = text;
-        });
+          this.processMessage(message, entry, result, modifiedFilesSet, filesReadSet, (text) => {
+            lastAssistantText = text;
+          });
       }
 
       // Handle flat entries (role at top level)
       if (!message && typeof entry['role'] === 'string') {
-        this.processMessage(entry, result, modifiedFilesSet, filesReadSet, (text) => {
-          lastAssistantText = text;
-        });
+          this.processMessage(entry, entry, result, modifiedFilesSet, filesReadSet, (text) => {
+            lastAssistantText = text;
+          });
       }
 
       // Subagent tracking
@@ -155,6 +155,7 @@ class TranscriptService {
 
   private processMessage(
     message: Record<string, unknown>,
+    entry: Record<string, unknown>,
     result: TranscriptParseResult,
     modifiedFilesSet: Set<string>,
     filesReadSet: Set<string>,
@@ -202,10 +203,10 @@ class TranscriptService {
           const toolCall: ToolCall = {
             toolName,
             toolUseId: b.id ?? '',
-            timestamp: new Date().toISOString(),
+            timestamp: getEntryTimestamp(entry),
             input: input as Record<string, unknown>,
             isMcp,
-            mcpServer: isMcp ? toolName.split('__')[1] ?? toolName.split('_')[1] : undefined,
+            mcpServer: isMcp ? extractMcpServer(toolName) : undefined,
             fileAffected: typeof filePath === 'string' ? filePath : undefined,
           };
           result.toolCalls.push(toolCall);
@@ -254,6 +255,28 @@ function extractTextFromContent(content: unknown): string {
 
 function toNumber(value: unknown): number {
   return typeof value === 'number' ? value : 0;
+}
+
+function sliceFromByteOffset(content: string, byteOffset: number): string {
+  if (byteOffset <= 0) return content;
+  return Buffer.from(content, 'utf-8').slice(byteOffset).toString('utf-8');
+}
+
+function getEntryTimestamp(entry: Record<string, unknown>): string {
+  const timestamp = entry['timestamp'];
+  return typeof timestamp === 'string' && timestamp
+    ? timestamp
+    : new Date().toISOString();
+}
+
+function extractMcpServer(toolName: string): string | undefined {
+  if (toolName.includes('__')) {
+    return toolName.split('__')[1] || undefined;
+  }
+  if (toolName.startsWith('mcp_')) {
+    return toolName.split('_')[1] || undefined;
+  }
+  return undefined;
 }
 
 function emptyTokenUsage(): TokenUsage {

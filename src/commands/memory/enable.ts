@@ -51,8 +51,16 @@ export async function enableAction(options: EnableOptions): Promise<void> {
   // 2. Session tracking hooks (Claude Code / Cursor)
   let sessionStatus = 'skipped';
   if (installClaudeCompat) {
-    const result = await installSessionHooks(gitRoot, 'claude-code');
-    sessionStatus = result.changed ? 'installed' : 'already configured';
+    const sessionAgents: Array<'claude-code' | 'cursor'> = [];
+    if (agents.has('claude')) sessionAgents.push('claude-code');
+    if (agents.has('cursor')) sessionAgents.push('cursor');
+
+    let changed = false;
+    for (const agentName of sessionAgents) {
+      const result = await installSessionHooks(gitRoot, agentName);
+      changed = result.changed || changed;
+    }
+    sessionStatus = changed ? 'installed' : 'already configured';
   }
 
   // 3. Codex notify

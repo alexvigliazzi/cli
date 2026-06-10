@@ -34,7 +34,7 @@ export async function handleHook(
     // Hooks must fail open — never block the agent.
     if (process.env.KODUS_VERBOSE === 'true') {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[decisions] hook error: ${message}`);
+      console.error(`[session-hooks] hook error: ${message}`);
     }
   }
 }

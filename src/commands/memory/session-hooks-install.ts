@@ -9,8 +9,11 @@ function isRecord(value: unknown): value is JsonObject {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isSessionsHookCommand(command: string): boolean {
-  return command.includes(SESSIONS_HOOK_PREFIX);
+function isSessionsHookCommand(command: string, agentName?: string): boolean {
+  const expectedPrefix = agentName
+    ? `${SESSIONS_HOOK_PREFIX} ${agentName} `
+    : SESSIONS_HOOK_PREFIX;
+  return command.includes(expectedPrefix);
 }
 
 async function readJsonObject(filePath: string): Promise<JsonObject> {
@@ -33,7 +36,13 @@ function ensureObject(root: JsonObject, key: string): JsonObject {
   return next;
 }
 
-function upsertHook(hooks: JsonObject, eventKey: string, matcherName: string, command: string): boolean {
+function upsertHook(
+  hooks: JsonObject,
+  eventKey: string,
+  matcherName: string,
+  command: string,
+  agentName: string,
+): boolean {
   const existing = hooks[eventKey];
   const matchers: unknown[] = Array.isArray(existing) ? existing : [];
   if (!Array.isArray(existing)) hooks[eventKey] = matchers;
@@ -54,7 +63,7 @@ function upsertHook(hooks: JsonObject, eventKey: string, matcherName: string, co
     // Replace existing sessions hook command if present
     for (const hookValue of hooksArray) {
       if (!isRecord(hookValue) || hookValue.type !== 'command' || typeof hookValue.command !== 'string') continue;
-      if (isSessionsHookCommand(hookValue.command)) {
+      if (isSessionsHookCommand(hookValue.command, agentName)) {
         hookValue.command = command;
         return true;
       }
@@ -82,13 +91,13 @@ export async function installSessionHooks(
   const cmd = (hookEvent: string) => `${SESSIONS_HOOK_PREFIX} ${agentName} ${hookEvent}`;
 
   let changed = false;
-  changed = upsertHook(hooks, 'SessionStart', '', cmd('session-start')) || changed;
-  changed = upsertHook(hooks, 'SessionEnd', '', cmd('session-end')) || changed;
-  changed = upsertHook(hooks, 'Stop', '', cmd('stop')) || changed;
-  changed = upsertHook(hooks, 'UserPromptSubmit', '', cmd('user-prompt-submit')) || changed;
-  changed = upsertHook(hooks, 'PreToolUse', 'Task', cmd('pre-task')) || changed;
-  changed = upsertHook(hooks, 'PostToolUse', 'Task', cmd('post-task')) || changed;
-  changed = upsertHook(hooks, 'PostToolUse', 'TodoWrite', cmd('post-todo')) || changed;
+  changed = upsertHook(hooks, 'SessionStart', '', cmd('session-start'), agentName) || changed;
+  changed = upsertHook(hooks, 'SessionEnd', '', cmd('session-end'), agentName) || changed;
+  changed = upsertHook(hooks, 'Stop', '', cmd('stop'), agentName) || changed;
+  changed = upsertHook(hooks, 'UserPromptSubmit', '', cmd('user-prompt-submit'), agentName) || changed;
+  changed = upsertHook(hooks, 'PreToolUse', 'Task', cmd('pre-task'), agentName) || changed;
+  changed = upsertHook(hooks, 'PostToolUse', 'Task', cmd('post-task'), agentName) || changed;
+  changed = upsertHook(hooks, 'PostToolUse', 'TodoWrite', cmd('post-todo'), agentName) || changed;
 
   if (changed) {
     await fs.mkdir(path.dirname(settingsPath), { recursive: true });
@@ -107,7 +116,8 @@ export async function removeSessionHooks(repoRoot: string): Promise<{ settingsPa
     const parsed = JSON.parse(content) as unknown;
     if (!isRecord(parsed)) return { settingsPath, removed: false };
     settings = parsed;
-  } catch {
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     return { settingsPath, removed: false };
   }
 

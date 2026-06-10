@@ -21,7 +21,7 @@ export interface AgentAdapter {
   /**
    * Read and parse the agent's transcript file.
    * @param transcriptPath Path to the transcript file.
-   * @param fromOffset Start parsing from this byte offset (for incremental).
+   * @param fromOffset Start parsing from this byte offset (for incremental parsing).
    */
   readTranscript(transcriptPath: string, fromOffset?: number): Promise<TranscriptParseResult>;
 
