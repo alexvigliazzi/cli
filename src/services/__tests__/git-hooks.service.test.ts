@@ -34,7 +34,7 @@ describe('gitHooksService.install', () => {
 
     const postContent = await fs.readFile(hookPath('post-commit'), 'utf-8');
     expect(postContent).toContain('kodus-session-hooks');
-    expect(postContent).toContain('kodus sessions hooks claude-code stop');
+    expect(postContent).toContain('kodus decisions hooks claude-code stop');
   });
 
   it('hooks are executable', async () => {

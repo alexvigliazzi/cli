@@ -13,7 +13,7 @@ if [ -d "$KODY_SESSION_DIR" ]; then
   if [ -n "$ACTIVE_SESSION" ]; then
     SESSION_ID=$(basename "$ACTIVE_SESSION" .json)
     SHORT_ID=$(echo "$SESSION_ID" | cut -c1-12)
-    if ! grep -q "Kody-Checkpoint:" "$1" 2>/dev/null; then
+    if ! grep -qE "^[[:space:]]*Kody-Checkpoint:" "$1" 2>/dev/null; then
       echo "" >> "$1"
       echo "Kody-Checkpoint: $SHORT_ID" >> "$1"
     fi
@@ -25,7 +25,13 @@ ${KODY_CHECKPOINT_END_MARKER}
 const POST_COMMIT_SCRIPT = `
 ${KODY_CHECKPOINT_MARKER}
 # Notify kodus of git commit for checkpoint condensation
-kodus sessions hooks claude-code stop 2>/dev/null &
+if command -v kodus >/dev/null 2>&1; then
+  kodus decisions hooks claude-code stop 2>/dev/null &
+elif command -v npx >/dev/null 2>&1; then
+  npx kodus decisions hooks claude-code stop 2>/dev/null &
+elif [ -x "./node_modules/.bin/kodus" ]; then
+  ./node_modules/.bin/kodus decisions hooks claude-code stop 2>/dev/null &
+fi
 ${KODY_CHECKPOINT_END_MARKER}
 `.trimStart();
 

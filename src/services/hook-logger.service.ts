@@ -3,6 +3,7 @@ import path from 'path';
 import type { LogLevel, LogComponent, LogEntry } from '../types/session.js';
 
 const LOG_FILE = '.kody/logs/hooks.jsonl';
+const MAX_LOG_BYTES = 1024 * 1024;
 
 class HookLoggerService {
   private logDir: string | null = null;
@@ -51,9 +52,24 @@ class HookLoggerService {
     };
 
     try {
+      await this.rotateIfNeeded();
       await fs.appendFile(this.logPath, JSON.stringify(entry) + '\n', 'utf-8');
     } catch {
       // Logging must never break the hook flow.
+    }
+  }
+
+  private async rotateIfNeeded(): Promise<void> {
+    if (!this.logPath) return;
+
+    try {
+      const stat = await fs.stat(this.logPath);
+      if (stat.size < MAX_LOG_BYTES) return;
+
+      const rotatedPath = `${this.logPath}.${new Date().toISOString().replace(/[:.]/g, '-')}`;
+      await fs.rename(this.logPath, rotatedPath);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
     }
   }
 }

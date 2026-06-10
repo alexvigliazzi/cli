@@ -42,7 +42,7 @@ decisionsCommand
 
 decisionsCommand
   .command('list')
-  .description('List all tracked sessions')
+  .description('Show where to view tracked sessions')
   .action(listAction);
 
 decisionsCommand

@@ -100,6 +100,24 @@ async function flushPending(repoRoot: string, token: string): Promise<void> {
   }
 }
 
+async function flushMemoryPending(token: string): Promise<void> {
+  if (memoryPendingEvents.length === 0) return;
+
+  const failed: Array<{ repoRoot: string; event: SessionApiEvent }> = [];
+  for (const pending of memoryPendingEvents.splice(0)) {
+    try {
+      await postEvent(pending.event, token);
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode < 500 && error.statusCode !== 429) {
+        continue;
+      }
+      failed.push(pending);
+    }
+  }
+
+  memoryPendingEvents.push(...failed);
+}
+
 export class RealSessionsApi implements ISessionsApi {
   async sendEvent(event: SessionApiEvent, repoRoot: string): Promise<void> {
     const token = await getAuthToken();
@@ -114,6 +132,7 @@ export class RealSessionsApi implements ISessionsApi {
     // Try to flush pending events first
     try {
       await flushPending(repoRoot, token);
+      await flushMemoryPending(token);
     } catch {
       // Non-blocking — continue with current event
     }
