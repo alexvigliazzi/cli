@@ -129,12 +129,17 @@ export class RealSessionsApi implements ISessionsApi {
       return;
     }
 
-    // Try to flush pending events first
+    // Try to flush pending events first. Each buffer is independent.
     try {
       await flushPending(repoRoot, token);
+    } catch {
+      // Non-blocking - continue with memory buffer and current event.
+    }
+
+    try {
       await flushMemoryPending(token);
     } catch {
-      // Non-blocking — continue with current event
+      // Non-blocking - continue with current event.
     }
 
     // Send current event

@@ -131,35 +131,6 @@ function pickString(obj: Record<string, unknown>, keys: string[]): string | unde
   return undefined;
 }
 
-function extractTextFromContent(content: unknown): string {
-  if (typeof content === 'string') return content;
-  if (!Array.isArray(content)) return '';
-
-  const texts: string[] = [];
-  for (const block of content) {
-    if (!block || typeof block !== 'object') continue;
-    const b = block as Record<string, unknown>;
-    if (b['type'] === 'text' && typeof b['text'] === 'string') {
-      texts.push(b['text'] as string);
-    }
-  }
-  return texts.join('\n');
-}
-
-function toNumber(value: unknown): number {
-  return typeof value === 'number' ? value : 0;
-}
-
-function emptyTokenUsage(): TokenUsage {
-  return {
-    inputTokens: 0,
-    cacheCreationTokens: 0,
-    cacheReadTokens: 0,
-    outputTokens: 0,
-    apiCallCount: 0,
-  };
-}
-
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
